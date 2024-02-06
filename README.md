@@ -65,10 +65,13 @@ $ anvil --help
 $ cast --help
 ```
 
-### StableCoin
+### OverCollaterized StableCoin
 
 1. Relative stability: Anchored or pegged --> $1.00
+   1. Chainlink price Feed
+   2. Set a function to exchange ETH & BTC --> $$$
 2. Stability Mechanism (Minting): Algorithmic (Decentralized)
+   1. People can only mint the stablecoin with enough collateral (coded)
 3. Collateral: Exogenous ( crypto )
-   1. ETH
-   2. BTC
+   1. wETH
+   2. wBTC

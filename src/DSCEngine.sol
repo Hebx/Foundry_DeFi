@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.18;
 
+import {DecentralizedStableCoin} from "./DecentralizedStableCoin.sol";
+
 /**
  * @title DSCEngine
  * @author Hebx
@@ -17,7 +19,65 @@ pragma solidity ^0.8.18;
  */
 
 contract DSCEngine {
-    function depositCollateral() external {}
+    ///////////////
+    // Errors  //
+    //////////////
+    error DSCEngine_MustBeMoreThanZero();
+    error DSCEngine_TokenAddressesAndPriceFeedAddressesMustMatch();
+
+    /////////////////////
+    // State Variables  //
+    /////////////////////
+
+    mapping(address token => address priceFeed) private s_priceFeeds;
+    DecentralizedStableCoin private i_dsc;
+
+    /////////////////
+    // Modifiers  //
+    ////////////////
+    modifier moreThanZero(uint256 amount) {
+        if (amount == 0) {
+            revert DSCEngine_MustBeMoreThanZero();
+        }
+        _;
+    }
+
+    // modifier isAllowedToken(address token) {
+
+    // }
+
+    /////////////////
+    // Functions  //
+    ////////////////
+
+    constructor(
+        address[] memory tokenAddresses,
+        address[] memory priceFeedAddresses,
+        address dscAddress
+    ) {
+        // USD Price Feeds
+        if (tokenAddresses.length != priceFeedAddresses.length) {
+            revert DSCEngine_TokenAddressesAndPriceFeedAddressesMustMatch();
+        }
+        for (uint256 i = 0; i < tokenAddresses.length; i++) {
+            s_priceFeeds[tokenAddresses[i]] = priceFeedAddresses[i];
+        }
+    }
+
+    ///////////////////////
+    // External Function //
+    //////////////////////
+
+    /**
+     * @dev deposit collateral to mint DSC
+     * @param tokenCollateralAddress the address of the collateral token
+     * @param amountCollateral the amount of the collateral to deposit
+     */
+
+    function depositCollateral(
+        address tokenCollateralAddress,
+        uint256 amountCollateral
+    ) external moreThanZero(amountCollateral) {}
 
     function depositCollateralAndMintDsc() external {}
 
