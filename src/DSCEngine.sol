@@ -5,6 +5,7 @@ pragma solidity ^0.8.18;
 import {DecentralizedStableCoin} from "./DecentralizedStableCoin.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
 /**
  * @title DSCEngine
@@ -31,10 +32,14 @@ contract DSCEngine is ReentrancyGuard {
     /////////////////////
     // State Variables  //
     /////////////////////
+    uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
+    uint256 private constant PRECISION = 1e18;
 
     mapping(address token => address priceFeed) private s_priceFeeds;
     DecentralizedStableCoin private immutable i_dsc;
     mapping(address user => mapping(address token => uint256 amount)) private s_collateralDeposited;
+    mapping(address user => uint256 amountDscMinted) private s_dscMinted;
+    address[] private s_collateralTokens;
 
     /////////////////
     // Events  //
@@ -69,6 +74,7 @@ contract DSCEngine is ReentrancyGuard {
         }
         for (uint256 i = 0; i < tokenAddresses.length; i++) {
             s_priceFeeds[tokenAddresses[i]] = priceFeedAddresses[i];
+            s_collateralTokens.push(tokenAddresses[i]);
         }
         i_dsc = DecentralizedStableCoin(dscAddress);
     }
@@ -97,17 +103,77 @@ contract DSCEngine is ReentrancyGuard {
         }
     }
 
+    /**
+     * @notice check if the collateral value > DSC value / minimum threshold
+     * @notice Must revert if the Health Factor is broken
+     * @param amountDscToMint the amount of DSC to mint
+     */
+    function mintDsc(uint256 amountDscToMint) external moreThanZero(amountDscToMint) {
+        s_dscMinted[msg.sender] += amountDscToMint;
+    }
+
     function depositCollateralAndMintDsc() external {}
 
     function redeemCollateral() external {}
 
     function redeemCollateralForDsc() external {}
 
-    function mintDsc() external {}
-
     function burnDsc() external {}
 
     function liquidate() external {}
 
     function getHealthFactor() external view {}
+
+    ////////////////////////////////////
+    // Private &Internal View Function //
+    ///////////////////////////////////
+    function _getAccountInformation(address user)
+        private
+        view
+        returns (uint256 totalDscMinted, uint256 collateralValueInUsd)
+    {
+        totalDscMinted = s_dscMinted[user];
+        collateralValueInUsd = getAccountCollateralValue(user);
+    }
+
+    /**
+     * @notice returns how close to liquidation the user is
+     * @notice if a user goes below 1, then they get liquidated
+     * @param user the address of the user to check
+     */
+    function _healthFactor(address user) private view returns (uint256) {
+        (uint256 totalDscMinted, uint256 collateralValueInUsd) = _getAccountInformation(user);
+    }
+    /**
+     * @notice do they have enough collateral
+     * @notice set a threshold
+     * @param user the address of the user to check
+     */
+
+    function revertIfHealthFactorIsBroken(address user) internal view {}
+
+    ////////////////////////////////////
+    // Private &Internal View Function //
+    ///////////////////////////////////
+    /**
+     * @param user the address of the user to check
+     * @notice loop through all the collateral tokens and get the amount they have deposited
+     * @notice map it to the price to get the usd value
+     */
+    function getAccountCollateralValue(address user) public view returns (uint256 totalCollateralValueInUsd) {
+        for (uint256 i = 0; i < s_collateralTokens.length; i++) {
+            address token = s_collateralTokens[i];
+            uint256 amount = s_collateralDeposited[user][token];
+            totalCollateralValueInUsd += _getUsdValue(token, amount);
+        }
+        return totalCollateralValueInUsd;
+    }
+    ///@dev let's say 1 ETH = 1000 USD, the returned value from chainlink will be 1000 * 1e8
+    ///@dev we pretend all usd pairs have 8 decimals, we will convert it to 18 decimal for WEI
+
+    function _getUsdValue(address token, uint256 amount) private view returns (uint256) {
+        AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
+        (, int256 price,,,) = priceFeed.latestRoundData();
+        return ((uint256(price) * amount * ADDITIONAL_FEED_PRECISION) / PRECISION);
+    }
 }
