@@ -135,7 +135,7 @@ contract DSCEngine is ReentrancyGuard {
     function getHealthFactor() external view {}
 
     ////////////////////////////////////
-    // Private &Internal View Function //
+    // Private &Internal  Function //
     ///////////////////////////////////
     function _getAccountInformation(address user)
         private
@@ -170,7 +170,7 @@ contract DSCEngine is ReentrancyGuard {
     }
 
     ////////////////////////////////////
-    // Private &Internal View Function //
+    // Public View Function //
     ///////////////////////////////////
     /**
      * @param user the address of the user to check
@@ -181,14 +181,14 @@ contract DSCEngine is ReentrancyGuard {
         for (uint256 i = 0; i < s_collateralTokens.length; i++) {
             address token = s_collateralTokens[i];
             uint256 amount = s_collateralDeposited[user][token];
-            totalCollateralValueInUsd += _getUsdValue(token, amount);
+            totalCollateralValueInUsd += getUsdValue(token, amount);
         }
         return totalCollateralValueInUsd;
     }
     ///@dev let's say 1 ETH = 1000 USD, the returned value from chainlink will be 1000 * 1e8
     ///@dev we pretend all usd pairs have 8 decimals, we will convert it to 18 decimal for WEI
 
-    function _getUsdValue(address token, uint256 amount) public view returns (uint256) {
+    function getUsdValue(address token, uint256 amount) public view returns (uint256) {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
         (, int256 price,,,) = priceFeed.latestRoundData();
         return ((uint256(price) * amount * ADDITIONAL_FEED_PRECISION) / PRECISION);
