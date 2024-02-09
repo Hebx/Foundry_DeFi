@@ -188,7 +188,7 @@ contract DSCEngine is ReentrancyGuard {
     ///@dev let's say 1 ETH = 1000 USD, the returned value from chainlink will be 1000 * 1e8
     ///@dev we pretend all usd pairs have 8 decimals, we will convert it to 18 decimal for WEI
 
-    function _getUsdValue(address token, uint256 amount) private view returns (uint256) {
+    function _getUsdValue(address token, uint256 amount) public view returns (uint256) {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
         (, int256 price,,,) = priceFeed.latestRoundData();
         return ((uint256(price) * amount * ADDITIONAL_FEED_PRECISION) / PRECISION);
