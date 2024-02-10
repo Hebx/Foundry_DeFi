@@ -31,6 +31,7 @@ contract DSCEngine is ReentrancyGuard {
     error DSCEngine__HealthFactorIsBroken(uint256 healthFactor);
     error DSCEngine__MINT_FAILED();
     error DSCEngine__HealthFactorOk();
+    error DSCEngine__HealthFactorNotImproved();
 
     /////////////////////
     // State Variables  //
@@ -160,12 +161,13 @@ contract DSCEngine is ReentrancyGuard {
     }
 
     function burnDsc(uint256 amount) public moreThanZero(amount) {
-        s_dscMinted[msg.sender] -= amount;
-        bool success = i_dsc.transferFrom(msg.sender, address(this), amount);
-        if (!success) {
-            revert DSCEngine_TransferFailed();
-        }
-        i_dsc.burn(amount);
+        // s_dscMinted[msg.sender] -= amount;
+        // bool success = i_dsc.transferFrom(msg.sender, address(this), amount);
+        // if (!success) {
+        //     revert DSCEngine_TransferFailed();
+        // }
+        // i_dsc.burn(amount);
+        _burnDsc(amount, msg.sender, msg.sender);
         _revertIfHealthFactorIsBroken(msg.sender); // [GAS AUDIT] Maybe it will never hit this line because of the burn
     }
     /**
@@ -208,6 +210,13 @@ contract DSCEngine is ReentrancyGuard {
         uint256 bonusCollateral = (tokenAmountFromDebtCovered * LIQUIDATION_BONUS) / LIQUIDATION_PRECISION;
         uint256 totalCollateralToRedeem = tokenAmountFromDebtCovered + bonusCollateral;
         _redeemCollateral(collateral, totalCollateralToRedeem, user, msg.sender);
+        _burnDsc(debtToCover, user, msg.sender);
+        uint256 endingUserHealthFactor = _healthFactor(user);
+        if (endingUserHealthFactor <= startingUserHealthFactor) {
+            revert DSCEngine__HealthFactorNotImproved();
+        }
+        // We must also check the health factor of the liquidator if it got broken after the liquidation
+        _revertIfHealthFactorIsBroken(msg.sender);
     }
 
     function getHealthFactor() external view {}
@@ -256,6 +265,18 @@ contract DSCEngine is ReentrancyGuard {
         if (!success) {
             revert DSCEngine_TransferFailed();
         }
+    }
+    /**
+     * @dev Low Level internal function , do not call unless the function calling it checks the health factor
+     */
+
+    function _burnDsc(uint256 amountDscToBurn, address onBehalfOf, address dscFrom) private {
+        s_dscMinted[onBehalfOf] -= amountDscToBurn;
+        bool success = i_dsc.transferFrom(dscFrom, address(this), amountDscToBurn);
+        if (!success) {
+            revert DSCEngine_TransferFailed();
+        }
+        i_dsc.burn(amountDscToBurn);
     }
 
     ////////////////////////////////////
