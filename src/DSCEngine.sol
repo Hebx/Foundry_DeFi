@@ -50,6 +50,7 @@ contract DSCEngine is ReentrancyGuard {
     // Events  //
     ////////////////
     event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
+    event CollateralRedeemed(address indexed user, uint256 indexed amount, address indexed token);
 
     /////////////////
     // Modifiers  //
@@ -95,7 +96,7 @@ contract DSCEngine is ReentrancyGuard {
      * @param amountCollateral the amount of the collateral to deposit
      */
     function depositCollateral(address tokenCollateralAddress, uint256 amountCollateral)
-        external
+        public
         moreThanZero(amountCollateral)
         isAllowedToken(tokenCollateralAddress)
         nonReentrant
@@ -113,7 +114,7 @@ contract DSCEngine is ReentrancyGuard {
      * @notice Must revert if the Health Factor is broken
      * @param amountDscToMint the amount of DSC to mint
      */
-    function mintDsc(uint256 amountDscToMint) external moreThanZero(amountDscToMint) {
+    function mintDsc(uint256 amountDscToMint) public moreThanZero(amountDscToMint) {
         s_dscMinted[msg.sender] += amountDscToMint;
         _revertIfHealthFactorIsBroken(msg.sender);
         bool minted = i_dsc.mint(msg.sender, amountDscToMint);
@@ -122,13 +123,53 @@ contract DSCEngine is ReentrancyGuard {
         }
     }
 
-    function depositCollateralAndMintDsc() external {}
+    /**
+     *
+     * @param tokenCollateralAddress the address of the token to deposit as collateral
+     * @param amountCollateral the amount of collateral to deposit
+     * @param amountDscToMint the amount of decentralized stable coin to mint
+     * @notice deposit collateral and mint DSC in one transaction
+     */
+    function depositCollateralAndMintDsc(
+        address tokenCollateralAddress,
+        uint256 amountCollateral,
+        uint256 amountDscToMint
+    ) external {
+        depositCollateral(tokenCollateralAddress, amountCollateral);
+        mintDsc(amountDscToMint);
+    }
 
-    function redeemCollateral() external {}
+    // in order to redeem, health factor must be above 1 after collateral pulled
+    function redeemCollateral(address tokenCollateralAddress, uint256 amountCollateral)
+        public
+        moreThanZero(amountCollateral)
+        nonReentrant
+    {
+        s_collateralDeposited[msg.sender][tokenCollateralAddress] -= amountCollateral;
+        emit CollateralRedeemed(msg.sender, amountCollateral, tokenCollateralAddress);
+        bool success = IERC20(tokenCollateralAddress).transfer(msg.sender, amountCollateral);
+        if (!success) {
+            revert DSCEngine_TransferFailed();
+        }
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
 
-    function redeemCollateralForDsc() external {}
+    function burnDsc(uint256 amount) public moreThanZero(amount) {
+        s_dscMinted[msg.sender] -= amount;
+        bool success = i_dsc.transferFrom(msg.sender, address(this), amount);
+        if (!success) {
+            revert DSCEngine_TransferFailed();
+        }
+        i_dsc.burn(amount);
+        _revertIfHealthFactorIsBroken(msg.sender); // [GAS AUDIT] Maybe it will never hit this line because of the burn
+    }
 
-    function burnDsc() external {}
+    function redeemCollateralForDsc(address tokenCollateralAddress, uint256 amountCollateral, uint256 amountDscToBurn)
+        external
+    {
+        burnDsc(amountDscToBurn);
+        redeemCollateral(tokenCollateralAddress, amountCollateral);
+    }
 
     function liquidate() external {}
 
