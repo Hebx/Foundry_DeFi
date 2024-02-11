@@ -73,5 +73,12 @@ $ cast --help
 2. Stability Mechanism (Minting): Algorithmic (Decentralized)
    1. People can only mint the stablecoin with enough collateral (coded)
 3. Collateral: Exogenous ( crypto )
+
    1. wETH
    2. wBTC
+
+4. calculate health factor function
+5. set health factor if debt is 0
+6. added getters view functions
+
+7. invariants/properties
