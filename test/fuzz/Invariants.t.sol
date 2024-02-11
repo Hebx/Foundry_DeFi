@@ -47,4 +47,6 @@ contract InvariantsTest is StdInvariant, Test {
         console.log("Times mint is called: ", handler.timesMintIsCalled());
         assert(wEthValue + wBtcValue >= totalSupply);
     }
+
+    // function invariant_gettersShouldNotRevert() public view {}
 }
